@@ -1,0 +1,10 @@
+name: imagy
+channels:
+  - defaults
+dependencies:
+  - numpy
+  - python=3.10
+  - pytorch
+  - matplotlib
+  - transformers
+prefix: /Applications/anaconda3/envs/imagy

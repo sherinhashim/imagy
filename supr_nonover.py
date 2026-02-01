@@ -3,12 +3,13 @@ import torch
 import matplotlib.pyplot as plt
 from PIL import Image
 from transformers import AutoImageProcessor, SuperPointForKeypointDetection
+import mahotas
+import helper
 
 # ----------------------------
 # PARAMETERS
 # ----------------------------
-alpha = 0.8          # position > strength
-MAX_POINTS = 12       # number of circles
+alpha = helper.ALPHA          # position > strength
 
 # ----------------------------
 # LOAD IMAGE
@@ -100,7 +101,7 @@ for point, sd, desc, score in zip(sorted_pts, sorted_Sd, sorted_descriptors, sor
     if not overlap:
         selected.append((x, y, radius, desc, score))
 
-    if len(selected) >= MAX_POINTS:
+    if len(selected) >= helper.MAX_POINTS:
         break
 
 print("Final stable non-overlapping points selected:", len(selected))
@@ -110,12 +111,38 @@ print("Final stable non-overlapping points selected:", len(selected))
 # ----------------------------
 fig, ax = plt.subplots(figsize=(6,6))
 ax.imshow(image)
+greyImage = np.array(image.convert("L"))
+#zerikes = []
+waterMark = helper.WATER_MARK
+waterMarkLen = len(waterMark)
 
 for x, y, r, desc, score in selected:
     circle = plt.Circle((x, y), r, fill=False, linewidth=2)
     ax.add_patch(circle)
     ax.scatter(x, y)
-    print(f"Point: ({x:.1f}, {y:.1f}), Radius: {r:.1f}, Score: {score:.4f}, Descriptor Norm: {desc}")
+    #print(f"Point: ({x:.1f}, {y:.1f}), Radius: {r:.1f}, Score: {score:.4f}, Descriptor Norm: {desc}")
+    print(f"Point: ({x:.1f}, {y:.1f}), Radius: {r:.1f}, Score: {score:.4f}")
+    value = mahotas.features.zernike_moments(greyImage, r, degree=helper.DEG, cm=(y, x))
+    #print(f"Zernike Moments (degree 64) at this point: {value}")
+    #zerikes.append(value)
+    c_n_m = []
+    for n in range(1, helper.DEG, 1):
+        for m in range(0, n+1, 1):
+            if (n - m) % 2 != 0 or m < 0:
+                continue
+            if m % 4 != 0:
+                val = helper.get_specific_zernike(value, helper.DEG, n, m)
+                c_n_m.append((n, m, val))
+                #print(f"  Moment ({n},{m}): {val:.4f}")
+    #TODO can modify the key here to select different moments
+    CK_n_m = c_n_m[0:waterMarkLen]
+    print("  Watermark bits and corresponding moments:")
+    for i, (n, m, val) in enumerate(CK_n_m):
+        bit = waterMark[i]
+        print(f"    Bit: {bit}, Moment ({n},{m}): {val:.4f}")
+    #z_0 = helper.get_specific_zernike(value, helper.DEG, 0, 0)
+    #z_i_r = (np.array(z_i) / z_0)*helper.T if z_0 != 0 else np.array(z_i)
+
 
 plt.axis("off")
 plt.savefig("non_overlapping_circles_old.png", dpi=300)

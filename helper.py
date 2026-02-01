@@ -1,3 +1,13 @@
+image_name = "lena.png"
+ALPHA = 0.8
+DEG = 64
+WATER_MARK = [1,0,1,0,1,0,1,1,1,1,0,0,0,0]  # Example watermark bits
+T = 50  # Example threshold for Zernike moment ratios
+MAX_POINTS = 12
+delta = 10
+
+import math
+
 def get_specific_zernike(moments_array, D, target_n, target_m):
     """
     Retrieves the value for a specific (n, m) from the flattened Mahotas array.
@@ -24,8 +34,8 @@ def get_specific_zernike(moments_array, D, target_n, target_m):
     final_idx = start_idx + offset
     return moments_array[final_idx]
 
-ALPHA = 0.8
-DEG = 64
-WATER_MARK = [1,0,1,0,1,0,1,1,1,1,0,0,0,0]  # Example watermark bits
-T = 50  # Example threshold for Zernike moment ratios
-MAX_POINTS = 12
+def quant(value, delta):
+    """
+    Quantizes the given value to the nearest multiple of delta.
+    """
+    return math.floor(value / delta)

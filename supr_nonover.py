@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -5,7 +6,7 @@ from PIL import Image
 from transformers import AutoImageProcessor, SuperPointForKeypointDetection
 import mahotas
 import helper
-
+from math import floor
 # ----------------------------
 # PARAMETERS
 # ----------------------------
@@ -14,7 +15,7 @@ alpha = helper.ALPHA          # position > strength
 # ----------------------------
 # LOAD IMAGE
 # ----------------------------
-image = Image.open("lena.png").convert("RGB")
+image = Image.open(helper.image_name).convert("RGB")
 W, H = image.size
 center = np.array([W/2, H/2])
 
@@ -126,7 +127,7 @@ for x, y, r, desc, score in selected:
     #print(f"Zernike Moments (degree 64) at this point: {value}")
     #zerikes.append(value)
     c_n_m = []
-    for n in range(1, helper.DEG, 1):
+    for n in range(0, helper.DEG, 1):
         for m in range(0, n+1, 1):
             if (n - m) % 2 != 0 or m < 0:
                 continue
@@ -135,14 +136,31 @@ for x, y, r, desc, score in selected:
                 c_n_m.append((n, m, val))
                 #print(f"  Moment ({n},{m}): {val:.4f}")
     #TODO can modify the key here to select different moments
-    CK_n_m = c_n_m[0:waterMarkLen]
-    print("  Watermark bits and corresponding moments:")
-    for i, (n, m, val) in enumerate(CK_n_m):
+    CK = c_n_m[0:waterMarkLen]
+    # print("  Watermark bits and corresponding moments:")
+    # for i, (n, m, val) in enumerate(CK):
+    #     bit = waterMark[i]
+    #     print(f"    Bit: {bit}, Moment ({n},{m}): {val:.4f}")
+    z_0_0 = helper.get_specific_zernike(value, helper.DEG, 0, 0)
+    # print(f"  z_0 (0,0) Moment: {z_0_0:.4f}")
+    z_r = [((val/z_0_0)*helper.T, n, m) for (n, m, val) in CK]
+    # print("  Scaled Zernike moments for watermark embedding:")
+    # for scaled_val, n, m in z_r:
+    #     print(f"    Moment ({n},{m}): {scaled_val:.4f}")
+    z_w = []
+    for i, (z_val, n, m) in enumerate(z_r):
         bit = waterMark[i]
-        print(f"    Bit: {bit}, Moment ({n},{m}): {val:.4f}")
-    #z_0 = helper.get_specific_zernike(value, helper.DEG, 0, 0)
-    #z_i_r = (np.array(z_i) / z_0)*helper.T if z_0 != 0 else np.array(z_i)
-
+        q_val = helper.quant(floor(abs(z_val)), helper.delta) * helper.delta
+        D = abs(z_val) - floor(abs(z_val))
+        val = 0
+        if bit == 1:
+            val = q_val + (3*(helper.delta / 4)) + D
+        else:
+            val = q_val + (helper.delta / 4) + D
+        val = (val / abs(z_val)) * z_val
+        z_w.append((val, n, m))
+        print(f"    Modified Moment ({n},{m}) for Bit {bit}: {val:.4f}")
+        # print(f"      Bit: {bit}, Quantized Value: {q_val}")
 
 plt.axis("off")
 plt.savefig("non_overlapping_circles_old.png", dpi=300)

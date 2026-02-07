@@ -25,13 +25,13 @@ zern.make_cart_grid(xx, yy, unit_circle=True)
 moments, res, rnk, sv = zern.fit_cart_grid(image_data)
 print(moments.shape)
 
-momemts_nomalized = (moments / moments[0]) * 50  # Normalize by the first moment (Z_0_0)
+moments_normalized = (moments / moments[0]) * 50  # Normalize by the first moment (Z_0_0)
 half_moments = moments.copy()
 half_moments[half_moments.shape[0]//2:] = 0  # Keep only the first moment, zero
 # zern1 = RZern(1)
 # zern1.make_cart_grid(xx, yy, unit_circle=True)
 
-newImg_normalized = zern.eval_grid(momemts_nomalized, matrix=True)
+newImg_normalized = zern.eval_grid(moments_normalized, matrix=True)
 newImg = zern.eval_grid(moments, matrix=True)
 halfImg = zern.eval_grid(half_moments, matrix=True)
 
@@ -40,22 +40,23 @@ finalImage = image_data + newImg
 finalImage_normalized = image_data + newImg_normalized
 finalImage_half = image_data + halfImg
 
-WATER_MARK_ORIG = np.random.randint(0, 2, size=128)
+# WATER_MARK_ORIG = np.random.randint(0, 2, size=128)
+WATER_MARK_ORIG = np.array([1,0,1,0,1,0,1,1,1,1,0,0,0,0])
 WATER_MARK = np.pad(WATER_MARK_ORIG, (0, moments.shape[0] - WATER_MARK_ORIG.shape[0]), mode='constant')
 print("Watermark bits:", WATER_MARK)
 
 delta = 4
-momemts_nomalized_abs = np.abs(momemts_nomalized)
-momemts_nomalized_abs_frac, momemts_nomalized_abs_dec = np.modf(momemts_nomalized_abs)
-moments_q = (momemts_nomalized_abs_dec // delta) * delta
-moments_q = moments_q + momemts_nomalized_abs_frac + 0.25 * delta + WATER_MARK * 0.5
+moments_normalized_abs = np.abs(moments_normalized)
+moments_normalized_abs_frac, moments_normalized_abs_dec = np.modf(moments_normalized_abs)
+moments_q = (moments_normalized_abs_dec // delta) * delta
+moments_q = moments_q + moments_normalized_abs_frac + 0.25 * delta + WATER_MARK * 0.5
 
 
-z_w = (moments_q / momemts_nomalized_abs) * momemts_nomalized
+z_w = (moments_q / moments_normalized_abs) * moments_normalized
 moments_for_watermark = z_w - moments
 
 irw = zern.eval_grid(moments_for_watermark, matrix=True)
-fianl_watermarked_image = image_data + irw
+final_watermarked_image = image_data + irw
 
 
 plt.figure(figsize=(30, 5))
@@ -80,10 +81,11 @@ plt.imshow(finalImage_half, cmap='gray')
 plt.title('Combined Image (Half Moments)')
 plt.axis('off')
 plt.subplot(1, 6, 6)
-plt.imshow(fianl_watermarked_image, cmap='gray')
+plt.imshow(final_watermarked_image, cmap='gray')
 plt.title('Watermarked Image')
 plt.axis('off')
 plt.tight_layout()
+plt.savefig('zernike/res.png')
 plt.show()
 
 print("z_w")

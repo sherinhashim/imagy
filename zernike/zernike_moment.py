@@ -2,6 +2,8 @@ import numpy as np
 from zernike import RZern
 from PIL import Image
 
+N = 8
+# pairs, cong_pairs = generate_zernike_pairs(N)
 # Load your image
 img = Image.open('lena.png').convert('L')  # Convert to grayscale
 image_data = np.array(img, dtype=float)
@@ -10,7 +12,7 @@ L, K = image_data.shape
 min_dim = min(L, K)
 image_data = image_data[:min_dim, :min_dim]
 # Create Zernike object (up to radial order 6)
-zern = RZern(16)
+zern = RZern(N)
 
 # Set up grid matching your image size
 L, K = image_data.shape  # height, width
@@ -21,9 +23,9 @@ xx, yy = np.meshgrid(dd, dy)
 # Create cartesian grid basis
 zern.make_cart_grid(xx, yy, unit_circle=True)
 
+
 # Compute Zernike moments (coefficients) from image
 moments, res, rnk, sv = zern.fit_cart_grid(image_data)
-print(moments.shape)
 
 moments_normalized = (moments / moments[0]) * 50  # Normalize by the first moment (Z_0_0)
 half_moments = moments.copy()
@@ -49,7 +51,9 @@ delta = 4
 moments_normalized_abs = np.abs(moments_normalized)
 moments_normalized_abs_frac, moments_normalized_abs_dec = np.modf(moments_normalized_abs)
 moments_q = (moments_normalized_abs_dec // delta) * delta
-moments_q = moments_q + moments_normalized_abs_frac + 0.25 * delta + WATER_MARK * 0.5
+moments_q = moments_q + moments_normalized_abs_frac + 0.25 * delta + WATER_MARK * 0.5 * delta
+e_q = moments_normalized_abs_dec - (moments_normalized_abs_dec//delta)
+e_w = delta/4 + (3 * delta * WATER_MARK / 4)
 
 
 z_w = (moments_q / moments_normalized_abs) * moments_normalized
@@ -57,6 +61,7 @@ moments_for_watermark = z_w - moments
 
 irw = zern.eval_grid(moments_for_watermark, matrix=True)
 final_watermarked_image = image_data + irw
+
 
 
 plt.figure(figsize=(30, 5))
@@ -86,9 +91,30 @@ plt.title('Watermarked Image')
 plt.axis('off')
 plt.tight_layout()
 plt.savefig('zernike/res.png')
-plt.show()
+# plt.show()
 
-print("z_w")
-print(np.array2string(z_w, formatter={'float_kind': lambda x: f'{x:.5f}'}))
+print("moments for watermark embedding")
+print(np.array2string(moments_for_watermark, formatter={'float_kind': lambda x: f'{x:.5f}'}))
 print("original moments")
 print(np.array2string(moments, formatter={'float_kind': lambda x: f'{x:.5f}'}))
+
+received_image = final_watermarked_image
+received_moments, _, _, _ = zern.fit_cart_grid(received_image)
+print("Received moments:")
+print(np.array2string(received_moments, formatter={'float_kind': lambda x: f'{x:.5f}'}))
+
+received_moments_normalized = (received_moments / received_moments[0]) * 50
+print("Received moments (normalized):")
+print(np.array2string(received_moments_normalized, formatter={'float_kind': lambda x: f'{x:.5f}'}))
+
+received_moments_abs = np.abs(received_moments_normalized)
+received_moments_abs = received_moments_abs - e_q + e_w  # Adjust for error terms   
+sigma = (delta % 4) / 4
+g_r_w = np.floor(received_moments_abs - sigma) + sigma
+q_g_r_w = (g_r_w // delta) * delta
+w_i_test = (g_r_w - q_g_r_w)
+print(f"w_i_test: {w_i_test[:len(WATER_MARK_ORIG)]}")
+print(f"Expected watermark bits: {WATER_MARK_ORIG}")
+check_val = delta / 2
+extracted_watermark = np.where(w_i_test <= check_val, 0, 1)
+print("Extracted Watermark:", extracted_watermark[:len(WATER_MARK_ORIG)])

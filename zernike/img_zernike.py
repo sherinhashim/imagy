@@ -73,20 +73,38 @@ reconstructed_image = zern.eval_grid(embeded_image_moments, matrix=True)
 reconstructed_image[np.isnan(reconstructed_image)] = 0
 
 final_image = image_data + reconstructed_image
+rotated_img = np.rot90(final_image, -1);
 
 plt.figure(figsize=(12, 5))
-plt.subplot(1, 2, 1)
+plt.subplot(1, 3, 1)
 plt.imshow(image_data, cmap='gray')
 plt.title("Original Image")
 plt.axis('off')
-plt.subplot(1, 2, 2)
+plt.subplot(1, 3, 2)
 plt.imshow(final_image, cmap='gray')
 plt.title("Image with Embedded Watermark in Zernike Moments")
+plt.axis('off')
+plt.subplot(1, 3, 3)
+plt.imshow(rotated_img, cmap='gray')
+plt.title("Image with Embedded Watermark in Zernike Moments rotated")
 plt.axis('off')
 plt.show()
 
 ### testing recovery of watermark
 received_image = final_image  # Simulate receiving the image
+#received_image = received_image[:min_dim, :min_dim]
+received_moments, _, _, _ = zern.fit_cart_grid(received_image)
+z_0_0 = received_moments[0]
+print("z_0_0:", z_0_0)
+received_zern_moments = get_moments_for_pairs(received_moments, pairs, zern)
+received_zern_cong_moments = get_moments_for_pairs(received_moments, cong_pairs, zern)
+recovered_watermark = get_water_mark_from_moments(received_zern_moments, z_0_0, T=T, delta=delta)
+recovered_watermark_cong = get_water_mark_from_moments(received_zern_cong_moments, z_0_0, T=T, delta=delta)
+print("Recovered Watermark Bits:          ", recovered_watermark)
+print("Recovered Conjugate Watermark Bits:", recovered_watermark_cong)
+print("Original Watermark Bits:           ", WATER_MARK_ORIG)
+
+received_image = rotated_img
 #received_image = received_image[:min_dim, :min_dim]
 received_moments, _, _, _ = zern.fit_cart_grid(received_image)
 z_0_0 = received_moments[0]

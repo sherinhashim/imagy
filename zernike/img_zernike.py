@@ -9,7 +9,7 @@ T = 120
 delta = 10
 
 pairs, cong_pairs = generate_zernike_pairs(N)
-WATER_MARK_ORIG = np.array([1,0,1,0,1,0,1,1,1,1,0,0,1,1])
+WATER_MARK_ORIG = np.array([1,0,1,0,1,0,1,1,1,1,0,0,1,0,1,1])
 pairs = pairs[:len(WATER_MARK_ORIG)]
 cong_pairs = cong_pairs[:len(WATER_MARK_ORIG)]
 
@@ -73,11 +73,19 @@ reconstructed_image = zern.eval_grid(embeded_image_moments, matrix=True)
 reconstructed_image[np.isnan(reconstructed_image)] = 0
 
 final_image = image_data + reconstructed_image
+
+plt.figure(figsize=(12, 5))
+plt.subplot(1, 2, 1)
 plt.imshow(image_data, cmap='gray')
+plt.title("Original Image")
+plt.axis('off')
+plt.subplot(1, 2, 2)
+plt.imshow(final_image, cmap='gray')
 plt.title("Image with Embedded Watermark in Zernike Moments")
 plt.axis('off')
 plt.show()
 
+### testing recovery of watermark
 received_image = final_image  # Simulate receiving the image
 #received_image = received_image[:min_dim, :min_dim]
 received_moments, _, _, _ = zern.fit_cart_grid(received_image)

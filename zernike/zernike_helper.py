@@ -67,7 +67,7 @@ def get_water_mark_from_moments(moments_array, z_0_0, T, delta):
     normalized_moments = (moments_array / z_0_0) * T  # Normalize by z_0_0 and scale by T
     normalized_moments_abs = np.abs(normalized_moments)
     sigma = (delta % 4) / 4
-    g_r_w = np.abs(normalized_moments_abs - sigma) + sigma
+    g_r_w = np.floor(normalized_moments_abs - sigma) + sigma
     w_set = g_r_w - ((g_r_w // delta) * delta)
     check_val = delta / 2
     extracted_watermark = np.where(w_set <= check_val, 0, 1)

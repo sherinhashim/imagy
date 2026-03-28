@@ -123,47 +123,9 @@ for x, y, r, desc, score in selected:
     ax.scatter(x, y)
     #print(f"Point: ({x:.1f}, {y:.1f}), Radius: {r:.1f}, Score: {score:.4f}, Descriptor Norm: {desc}")
     print(f"Point: ({x:.1f}, {y:.1f}), Radius: {r:.1f}, Score: {score:.4f}")
-    value = mahotas.features.zernike_moments(greyImage, r, degree=helper.DEG, cm=(y, x))
-    #print(f"Zernike Moments (degree 64) at this point: {value}")
-    #zerikes.append(value)
-    c_n_m = []
-    for n in range(0, helper.DEG, 1):
-        for m in range(0, n+1, 1):
-            if (n - m) % 2 != 0 or m < 0:
-                continue
-            if m % 4 != 0:
-                val = helper.get_specific_zernike(value, helper.DEG, n, m)
-                c_n_m.append((n, m, val))
-                #print(f"  Moment ({n},{m}): {val:.4f}")
-    #TODO can modify the key here to select different moments
-    CK = c_n_m[0:waterMarkLen]
-    # print("  Watermark bits and corresponding moments:")
-    # for i, (n, m, val) in enumerate(CK):
-    #     bit = waterMark[i]
-    #     print(f"    Bit: {bit}, Moment ({n},{m}): {val:.4f}")
-    z_0_0 = helper.get_specific_zernike(value, helper.DEG, 0, 0)
-    # print(f"  z_0 (0,0) Moment: {z_0_0:.4f}")
-    z_r = [((val/z_0_0)*helper.T, n, m) for (n, m, val) in CK]
-    # print("  Scaled Zernike moments for watermark embedding:")
-    # for scaled_val, n, m in z_r:
-    #     print(f"    Moment ({n},{m}): {scaled_val:.4f}")
-    z_w = []
-    for i, (z_val, n, m) in enumerate(z_r):
-        bit = waterMark[i]
-        q_val = helper.quant(floor(abs(z_val)), helper.delta) * helper.delta
-        D = abs(z_val) - floor(abs(z_val))
-        val = 0
-        if bit == 1:
-            val = q_val + (3*(helper.delta / 4)) + D
-        else:
-            val = q_val + (helper.delta / 4) + D
-        val = (val / abs(z_val)) * z_val
-        z_w.append((val, n, m))
-        print(f"    Modified Moment ({n},{m}) for Bit {bit}: {val:.4f}")
-        # print(f"      Bit: {bit}, Quantized Value: {q_val}")
-
+    
 plt.axis("off")
-plt.savefig("non_overlapping_circles_old.png", dpi=300)
+plt.savefig("non_overlapping_circles.png", dpi=300)
 plt.close()
 
 # ----------------------------
@@ -179,8 +141,8 @@ for x, y, r, desc, score in selected:
 
 plt.imshow(mask, cmap="gray")
 plt.axis("off")
-plt.savefig("compensation_mask_old.png", dpi=300)
+plt.savefig("compensation_mask.png", dpi=300)
 plt.close()
 
 print("Saved: non_overlapping_circles_old.png")
-print("Saved: compensation_mask_old.png")
+print("Saved: compensation_mask.png")

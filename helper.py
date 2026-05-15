@@ -1,41 +1,93 @@
-image_name = "lena.png"
-ALPHA = 0.8
-DEG = 64
-WATER_MARK = [1,0,1,0,1,0,1,1,1,1,0,0,0,0]  # Example watermark bits
-T = 50  # Example threshold for Zernike moment ratios
+from transformers import AutoImageProcessor, SuperPointForKeypointDetection
+import numpy as np
+import torch
+
 MAX_POINTS = 12
-delta = 10
 
-import math
+def get_radius(sd, r_tilde):
+    if sd > 0.66:
+        return (6/16) * r_tilde
+    elif sd > 0.33:
+        return (5/16) * r_tilde
+    else:
+        return (4/16) * r_tilde
 
-def get_specific_zernike(moments_array, D, target_n, target_m):
-    """
-    Retrieves the value for a specific (n, m) from the flattened Mahotas array.
-    """
-    # --- Quick Example ---
-    # If moments = mahotas.features.zernike_moments(img, r, degree=9)
-    # val = get_specific_zernike(moments, 9, 4, 2) 
-    # print(f"Moment (4,2) is: {val}")
-    # 1. Validation
-    if target_n > D:
-        raise ValueError(f"Target n ({target_n}) exceeds maximum degree D ({D})")
-    if target_m > target_n or (target_n - target_m) % 2 != 0 or target_m < 0:
-        raise ValueError(f"Invalid (n, m) pair: ({target_n}, {target_m})")
+def get_circles(image, alpha=0.8, max_point=10):
+    processor = AutoImageProcessor.from_pretrained("magic-leap-community/superpoint")
+    model = SuperPointForKeypointDetection.from_pretrained("magic-leap-community/superpoint")
 
-    # 2. Calculate the starting index for degree n
-    # The number of non-negative m values for any degree 'i' is (i // 2) + 1
-    start_idx = sum((i // 2) + 1 for i in range(target_n))
-    
-    # 3. Calculate the offset within that degree
-    # m values increment by 2 (e.g., for n=4, m is 0, 2, 4)
-    # The position of target_m is target_m // 2
-    offset = target_m // 2
-    
-    final_idx = start_idx + offset
-    return moments_array[final_idx]
+    inputs = processor(image, return_tensors="pt")
+    W, H = image.size
+    center = np.array([W/2, H/2])
 
-def quant(value, delta):
-    """
-    Quantizes the given value to the nearest multiple of delta.
-    """
-    return math.floor(value / delta)
+    with torch.no_grad():
+        outputs = model(**inputs)
+
+    # ----------------------------
+    # POST PROCESS
+    # ----------------------------
+    image_sizes = [(H, W)]
+    output = processor.post_process_keypoint_detection(outputs, image_sizes)
+
+    keypoints = output[0]["keypoints"].detach().cpu().numpy()  # (N,2)
+    scores = output[0]["scores"].detach().cpu().numpy()        # (N,)
+    descriptors = output[0]["descriptors"].detach().cpu().numpy()  # (N,256)
+
+    print("Total keypoints detected:", len(keypoints))
+
+    # ----------------------------
+    # 1. STABILITY SCORE (Sm)
+    # ----------------------------
+    Sm = (scores - scores.min()) / (scores.max() - scores.min() + 1e-8)
+
+    # ----------------------------
+    # 2. DISTANCE SCORE (Sd)
+    # ----------------------------
+    distances = np.linalg.norm(keypoints - center, axis=1)
+    Sd = 1 - (distances / (distances.max() + 1e-8))
+
+    # ----------------------------
+    # 3. COMPREHENSIVE SCORE
+    # ----------------------------
+    S = (1 - alpha) * Sm + alpha * Sd
+
+    # sort strongest
+    sorted_idx = np.argsort(-S)
+    sorted_pts = keypoints[sorted_idx]
+    sorted_Sd = Sd[sorted_idx]
+    sorted_descriptors = descriptors[sorted_idx]
+    sorted_scores = S[sorted_idx]
+
+    # ----------------------------
+    # 4. INSCRIBED IMAGE RADIUS (r~)
+    # ----------------------------
+    r_tilde = min(W, H) / 2
+    # ----------------------------
+    # 5. SELECT NON-OVERLAPPING CIRCLES (INSIDE IMAGE)
+    # ----------------------------
+    selected = []
+
+    for point, sd, desc, score in zip(sorted_pts, sorted_Sd, sorted_descriptors, sorted_scores):
+
+        x, y = point
+        radius = get_radius(sd, r_tilde)
+
+        # Must be INSIDE the image
+        if (x - radius < 0) or (x + radius > W) or (y - radius < 0) or (y + radius > H):
+            continue
+
+        overlap = False
+        for (px, py, pr, pd, ps) in selected:
+            dist = np.linalg.norm([x - px, y - py])
+            if dist < (radius + pr):
+                overlap = True
+                break
+
+        if not overlap:
+            selected.append((x, y, radius, desc, score))
+
+        if len(selected) >= max_point:
+            break
+
+    print("Final stable non-overlapping points selected:", len(selected))
+    return selected

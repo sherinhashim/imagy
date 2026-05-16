@@ -4,21 +4,13 @@ import torch
 
 MAX_POINTS = 12
 
-def get_radius(sd, r_tilde):
-    if sd > 0.66:
-        return (6/16) * r_tilde
-    elif sd > 0.33:
-        return (5/16) * r_tilde
-    else:
-        return (4/16) * r_tilde
-
-def get_circles(image, alpha=0.8, max_point=10):
+def get_super_points(image, alpha=0.8):
     processor = AutoImageProcessor.from_pretrained("magic-leap-community/superpoint")
     model = SuperPointForKeypointDetection.from_pretrained("magic-leap-community/superpoint")
 
     inputs = processor(image, return_tensors="pt")
     W, H = image.size
-    center = np.array([W/2, H/2])
+    center = np.array([W/2, H/2]).astype(int)
 
     with torch.no_grad():
         outputs = model(**inputs)
@@ -54,9 +46,30 @@ def get_circles(image, alpha=0.8, max_point=10):
     # sort strongest
     sorted_idx = np.argsort(-S)
     sorted_pts = keypoints[sorted_idx]
+    sorted_pts = np.vstack((center, sorted_pts))
+
     sorted_Sd = Sd[sorted_idx]
+    sorted_Sd = np.insert(sorted_Sd, 0 , 1)
     sorted_descriptors = descriptors[sorted_idx]
+    sorted_descriptors = np.vstack((np.ones(256),sorted_descriptors))
     sorted_scores = S[sorted_idx]
+    sorted_scores = np.insert(sorted_scores, 0, 1)
+
+    return sorted_pts, sorted_Sd, sorted_descriptors, sorted_scores
+   
+
+def get_radius(sd, r_tilde):
+    if sd > 0.66:
+        return (6/16) * r_tilde
+    elif sd > 0.33:
+        return (5/16) * r_tilde
+    else:
+        return (4/16) * r_tilde
+
+def get_circles(image, alpha=0.8, max_point=10):
+    sorted_pts, sorted_Sd, sorted_descriptors, sorted_scores = get_super_points(image, alpha)
+
+    W, H = image.size
 
     # ----------------------------
     # 4. INSCRIBED IMAGE RADIUS (r~)
